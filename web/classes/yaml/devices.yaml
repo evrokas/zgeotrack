@@ -44,6 +44,23 @@ form:
   action: "#"
 
   inputs:
+    # `type: text` (not hidden) so table_view's `guid` column (below) can
+    # actually render it -- WebForms.php's renderFormResults() can only
+    # ever show a table_view column that's ALSO a declared form input
+    # (it needs the input's own `type` to pick the right *Element class
+    # for that cell), and `guid` previously had no matching input at all,
+    # so it was being silently skipped column entirely: confirmed live,
+    # the rendered table's header only ever showed "Device name | Active
+    # | Device_key | Actions", `guid` dropped with no error anywhere.
+    # Deliberately NOT added to form_view's `fields:` list below, so it
+    # never appears on the actual Add/Edit device form -- table_view
+    # always renders every cell `disabled` regardless (see
+    # renderFormResults()'s own `$inputDef['attributes']['disabled']`),
+    # so this is read-only wherever it's shown, exactly as a guid should be.
+    - name: guid
+      label: "Guid"
+      type: text
+
     - name: name
       label: "Device name"
       type: text

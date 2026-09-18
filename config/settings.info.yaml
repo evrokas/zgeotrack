@@ -14,6 +14,37 @@ templates:
 css:
   - styles:
     src: 'css/styles.css'
+  # Vendored locally (web/css/bx/, copied verbatim from zpms's own copy --
+  # same LICENSE.txt carried along), not a CDN reference, matching this
+  # app's plain-CSS/no-external-runtime-dependency convention. Loaded
+  # unconditionally here, exactly how zpms's own settings.info.yaml does
+  # it (checked directly -- zpms does NOT reach it via `libraries:`/
+  # `attach_library()` despite that being what core's own admin_list.zetem
+  # calls; it's simply always in zpms's plain `css:` list, same as this).
+  # Needed because core's own webform/admin_crud table row buttons AND
+  # core/templates/nav/main_navigation.zetem's hamburger icon hardcode
+  # `bx bx-*` classes with no fallback -- confirmed live against this
+  # instance: every Edit/Delete button on /devices and the nav toggle
+  # rendered as an empty, icon-less clickable element with this missing.
+  #
+  # A first attempt used a `libraries: boxicons: src: ...` block plus
+  # `attach_library('boxicons')` calls in each content template, modeled
+  # on a misreading of zpms's config (the `- boxicons:` line under `css:`
+  # looked like a separate `libraries:` entry at a glance, but is a plain
+  # flat list item of `css:` itself, one indent level up from where it
+  # looked). Confirmed the mistake directly: `libraries:` parses to a
+  # numerically-indexed list (`[0 => ['boxicons' => null, 'src' => ...]]`)
+  # under that shape, not the `['boxicons' => ['css' => [...]]]` shape
+  # `attach_library_helper()`'s `array_key_exists($libname, ...)` actually
+  # needs -- zpms's own real `libraries:` block (used only for
+  # `loader-library`) confirms the genuinely-correct shape is keyed
+  # directly by name, one level up from `css:`/`foot_script:`, not a
+  # dashed list. Simpler to just match what zpms actually does for
+  # boxicons specifically (plain, unconditional `css:` entry) than to
+  # build out the more elaborate opt-in shape for a library every
+  # authenticated page already needs anyway.
+  - boxicons:
+    src: 'css/bx/css/boxicons.min.css'
 
 # Single-language deployment -- every string is written directly in the
 # .zetem templates rather than routed through t()/a dictionary, so there
