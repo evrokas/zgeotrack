@@ -25,52 +25,94 @@ just consumes it" pattern zpms/erweb already use.
 
 ### 1. Vendor the ZeusFW framework
 
-`web/core` is gitignored and never committed -- clone the framework
-checkout somewhere and symlink it in:
+`fw/` and `web/core` are both gitignored and never committed -- clone the
+framework checkout *into the repo itself* (not a sibling directory --
+`fw/bin/init.sh`/`update.sh` below both assume `sql/`, `config/`, `web/`
+all live under the same root they're invoked from) and symlink it in:
 
 ```sh
-git clone https://github.com/evrokas/zeusfw.git ../zeusfw   # or wherever
-ln -s /path/to/zeusfw/core web/core
+git clone https://github.com/evrokas/zeusfw.git fw
+ln -s fw/core web/core
 ```
 
-### 2. Database
+### 2. First-time setup: `fw/bin/init.sh`
+
+Run it from the repo root -- it walks through creating `config/db.php`
+and `sql/admin.sql` (both from their `.in` templates, both gitignored:
+`sql/admin.sql` is the same real credentials as `config/db.php`, just in
+a shape `sql/msql.sh`/`msqldump.sh` below can parse without a PHP
+interpreter) and, if you say yes, creates the database user/schema
+itself via `sudo mysql -u root -p < sql/admin.sql`:
 
 ```sh
-cp config/db.php.in config/db.php
-# edit config/db.php with real DB_HOST/DB_USER/DB_PASS/DB_NAME
+./fw/bin/init.sh
 ```
 
-Generate the entity classes/SQL from every `*.yaml` schema (this app's
-own `web/classes/yaml/{devices,locations}.yaml`, plus every framework-core
-table -- users, roles, permissions, role_permissions, user_roles,
-feed_hashes, etc.) and load them into a fresh database:
+Answer yes when it asks to update `admin.sql`/`db.php` and to create the
+database. Skip the last prompt ("create links to Zeus Framework folder")
+-- step 1 above already did that by hand; answering yes there would
+re-symlink `web/core` to wherever you type, which isn't necessary here.
+
+`sql/msql.sh`/`sql/msqldump.sh` (thin `mysql`/`mysqldump` wrappers that
+read `sql/admin.sql`'s own `CREATE USER`/`CREATE DATABASE` lines for
+credentials, so you're never typing a password on the command line) are
+committed here, copied verbatim from zpms's own `sql/` -- fully generic,
+no zpms-specific values baked in, so they work unmodified for any app on
+this framework. Two real constraints inherited from that parsing
+approach, confirmed by actually running it, not just reading it:
+
+- **Both scripts call the `gawk` binary by name**, not plain `awk` --
+  `mawk` (Debian/Ubuntu's default `awk` provider) doesn't have it under
+  that name, so a fresh box needs `apt install gawk` (or equivalent)
+  before `init.sh`/`update.sh`'s `sql/msql.sh` calls will work at all,
+  confirmed by reproducing "command not found" with only `mawk`
+  installed and no `gawk`.
+- **Your database password must not contain a single-quote character.**
+  `init.sh`'s substitution is a plain `sed`, and the result is a
+  single-quoted SQL string with no escaping -- a `'` in the password
+  breaks both the generated SQL and `msql.sh`'s own parsing of it back
+  out, confirmed by reproducing the exact corrupted output. Any other
+  character is fine; this was verified working end-to-end (template ->
+  real `admin.sql` -> `msql.sh` correctly recovering the same user/pass/db)
+  with a quote-free password.
+
+### 3. Every deploy (including the very first): `fw/bin/update.sh`
 
 ```sh
-cd web/core/classes
-php ../maker/maker.php spill:class:all
-php ../maker/maker.php update:bootstrap
-php ../maker/maker.php spill:sql:all
-# load every generated sql/*.sql this produced into your database, e.g.:
-for f in sql/*.sql; do mysql -u <user> -p <db> < "$f"; done
-cd -
-
-cd web/classes
-php ../core/maker/maker.php spill:class:all
-php ../core/maker/maker.php spill:sql:all
-for f in sql/*.sql; do mysql -u <user> -p <db> < "$f"; done
-cd -
+./fw/bin/update.sh
 ```
 
-There is no migration runner in this framework -- schema changes are
-always applied by hand this way, on every deploy that touches a `.yaml`.
+Also run from the repo root. This is the framework's own generic
+migration runner -- there is no separate one, and no manual
+`maker.php spill:class:all`/`spill:sql:all` dance to remember. It:
 
-### 3. Site config
+1. Regenerates every framework-core entity class + SQL from
+   `web/core/classes/yaml/*.yaml` (users, roles, permissions,
+   role_permissions, user_roles, feed_hashes, ...), offers to create any
+   table missing from the database, then shows a `diff:sql:all` and asks
+   before applying anything.
+2. Does the same for this app's own `web/classes/yaml/{devices,
+   locations}.yaml`.
+3. Asks about feeder content -- answer no; this app has none.
+4. **Scans `web/classes/yaml/*.yaml` for a `form:` key and offers to
+   `form:load` it into the `webforms` table.** `devices.yaml` has one --
+   say yes. This step is not optional bookkeeping: `formsClass::
+   renderForm()`/`renderFormResults()` (what `/devices` actually calls)
+   reads the form definition back out of that `webforms` table, not out
+   of the yaml file directly, so skipping this step leaves `/devices`
+   unable to render its add-device form at all on a fresh install.
+
+Re-run this same script on every future deploy that changes a `.yaml`
+schema or a webform's `form:`/`table_view:`/`form_view:` block -- there
+is no migration runner beyond this, on any app on this framework.
+
+### 4. Site config
 
 ```sh
 cp config/site.info.yaml.in config/site.info.yaml
 ```
 
-### 4. Seed roles/permissions and create the first login
+### 5. Seed roles/permissions and create the first login
 
 ```sh
 php bin/setup.php --dry-run     # see what it would do first
@@ -82,7 +124,7 @@ This seeds the `viewer`/`operator`/`administrator` roles (see
 `administrator` account so there's a way to log in and reach `/admin/users`
 at all.
 
-### 5. Point your web server at `web/`
+### 6. Point your web server at `web/`
 
 Any server that can run PHP 8.1+ with `mod_rewrite` (or an equivalent
 front-controller rewrite to `index.php`) works -- see `web/.htaccess`.
