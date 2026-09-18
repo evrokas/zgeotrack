@@ -128,6 +128,17 @@ if ($adminUser || $adminEmail || $adminPassword) {
                 'active' => 1,
                 'expired' => 0,
                 'wrongpasscount' => 0,
+                // Legacy column (zeusfw core users.yaml: `type: '@guid'` ->
+                // CHAR(36) NOT NULL) -- never read once an account has a
+                // real user_roles row (see core/lib/Rbac.php), which
+                // assignRole() below gives this one immediately, but the
+                // generated usersClass::insert() still binds every field
+                // unconditionally, so a NOT NULL column needs *something*
+                // or the INSERT itself fails outright. Confirmed the hard
+                // way: omitting this threw "Column 'roles' cannot be
+                // null" against a real MariaDB server before this line
+                // was added.
+                'roles' => guid(),
             ]);
             $u->insert();
 

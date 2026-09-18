@@ -1,0 +1,18 @@
+
+{% if(isset($notice)): %}
+<div class="notification notice">
+        {{$notice}}
+</div>
+{% endif %}
+
+{% if(isset($error)): %}
+<div class="notification error">
+    {{$error}}
+</div>
+{% endif %}
+
+{% if(isset($warning)): %}
+<div class="notification warning">
+    {{$warning}}
+</div>
+{% endif %}

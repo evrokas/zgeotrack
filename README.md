@@ -32,7 +32,7 @@ all live under the same root they're invoked from) and symlink it in:
 
 ```sh
 git clone https://github.com/evrokas/zeusfw.git fw
-ln -s fw/core web/core
+ln -s ../fw/core web/core
 ```
 
 ### 2. First-time setup: `fw/bin/init.sh`
@@ -168,19 +168,6 @@ for the full design. This app only owns its own permission vocabulary
 
 ## Known limitations
 
-- **Unchecking "Active" on an existing device while editing it does not
-  save.** An unchecked HTML checkbox simply isn't present in the POST
-  body at all, and ZeusFW core's generic `formsClass::storeFormResults()`
-  update path only touches a field that's actually present in the
-  submission -- so an edit that unchecks Active silently leaves the
-  device active in the database. This is an existing behavior of the
-  shared webform engine (not something specific to this app's
-  `devices.yaml`), identified by reading `storeFormResults()`'s update
-  path directly, not by driving the actual form through a browser (this
-  sandbox has no database to test against -- see the last item below).
-  Confirm it against a real deployment before relying on the Active
-  checkbox to disable a device; direct DB access is the reliable fallback
-  either way.
 - **No index on `locations(device_guid, recorded_at)`.** ZeusFW's schema
   YAML has no `index:` option beyond the single-column `UNIQUE`-in-type-
   string trick `devices.device_key` uses -- see `web/classes/yaml/locations.yaml`'s
@@ -192,26 +179,37 @@ for the full design. This app only owns its own permission vocabulary
   scoping. Add an `owner_guid` column and filter on it if this is ever
   used by more than one household/person who shouldn't see each other's
   devices.
-- **What was actually verified, and what wasn't** -- this sandbox has no
-  MySQL/MariaDB server and no path to a real iOS device, so verification
-  was done in layers instead of one real end-to-end run:
-  - `php -l` clean on every `.php` file; the generated `devices`/
-    `locations` SQL (`maker.php spill:sql:all` against a real, temporarily
-    vendored zeusfw checkout) matches the schema described above,
-    including the `UNIQUE` constraint on `device_key`.
-  - `devicesClassEx`/`locationsClassEx` (key generation, device lookup,
-    Overland point parsing -- including the `-1` sentinel and a
-    malformed-point rejection) were exercised against a real in-memory
-    SQLite database (via reflection into `dbConnection`'s PDO handle,
-    since it's hardcoded to a MySQL DSN) -- 18/18 checks passed.
-  - `web/api_overland.php`'s full HTTP-shaped handler (wrong key,
-    unknown device, right key) was run as a real subprocess against a
-    file-backed SQLite database -- unauthorized cases correctly return
-    `401`.
-  - **Not verified**: the JSON-body-parsing seam specifically (`php://input`
-    doesn't carry a request body under the CLI SAPI at all, so the
-    subprocess run above only exercised it with an empty body), the
-    generic webform CRUD flow (`/devices` add/edit/delete) end-to-end
-    through real HTTP, and anything against a real MySQL/MariaDB server
-    or a real Overland-running iPhone. Confirm all of these against a
-    real deployment before relying on this for anything time-sensitive.
+
+## Verified end-to-end
+
+Everything below was driven over real HTTP (`php -S` with a router script
+replicating `web/.htaccess`'s actual rewrite semantics) against a real
+MariaDB server, not assumed or unit-tested in isolation -- see zeusfw's
+own `CLAUDE.md` for the three real bugs this run found and fixed along
+the way (`core/lib/FormElement.php`'s checkbox rendering, `core/router/
+Request.php`'s query-string route matching, `bin/init.sh`'s database
+creation step):
+
+- `fw/bin/init.sh` and `fw/bin/update.sh` end to end -- real database/user
+  creation, every core + app table generated and loaded, the `devices`
+  webform's `form:load` step, `diff:sql:all` apply.
+- `bin/setup.php` seeding roles/permissions and creating the first
+  administrator account (this surfaced and fixed a real bug of its own --
+  see that file's own comment on the `roles` column).
+- Login (`/login` -> `/profile`), the map dashboard (`/`), the devices
+  page (`/devices`) including adding a device through the real webform
+  POST and editing it back with the Active checkbox and current name
+  correctly prefilled, `/locations`, and `/admin/users` (framework-
+  provided) -- all 200, all rendering real data.
+- The actual Overland ingestion contract: a wrong `key` returns `401`; a
+  real GeoJSON batch posted with query-string `device_id`/`key` params
+  (the exact shape Overland itself sends, and the exact case that
+  exposed the `Request.php` routing bug above) returns
+  `{"result":"ok"}` and lands correctly in `locations`, immediately
+  visible on both the map's `/api/locations/latest` and the `/locations`
+  table.
+
+Not verified: a real Overland-running iPhone (only the HTTP contract it
+uses was reproduced by hand) and the map page's own client-side Leaflet
+JS (no browser in this environment -- the data endpoint it fetches from
+was confirmed correct, but the map rendering itself wasn't screenshotted).
