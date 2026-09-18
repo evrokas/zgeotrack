@@ -131,24 +131,37 @@ front-controller rewrite to `index.php`) works -- see `web/.htaccess`.
 
 ## Adding a device
 
+Overland's own settings screen has 3 separate fields -- verified directly
+against [aaronpk/Overland-iOS](https://github.com/aaronpk/Overland-iOS)'s
+own docs, not assumed -- and this app uses all 3 rather than cramming
+everything into the URL:
+
 1. Log in as an `operator`/`administrator` account and go to **Devices**.
 2. Add a device -- a random 64-character key is generated automatically.
-3. In the table below, note that device's **guid** and **device_key**
-   columns.
-4. On the phone, open Overland's settings and set the **Receiver URL**
-   to:
-
-   ```
-   https://<your-host>/api/overland?device_id=<guid>&key=<device_key>
-   ```
-
-   (the exact URL, with the real guid/key already substituted, is also
-   printed at the top of the Devices page).
+3. On the phone, open Overland's settings and set:
+   - **Receiver URL**: `https://<your-host>/api/overland` (the same for
+     every device -- also shown, with its own copy button, at the top of
+     the Devices page).
+   - **Access Token**: that device's own **device_key** from the table
+     below (click the small copy button next to it) -- Overland sends
+     this back as a real `Authorization: Bearer` header, which is what
+     actually authenticates the device.
+   - **Device ID** (optional): that device's own **guid**, purely so
+     it's easy to recognize which device a point came from later. Not
+     needed for authentication -- Access Token alone already identifies
+     the device (`device_key` is `UNIQUE`).
 
 Overland batches its points locally and retries until this endpoint
-responds `{"result":"ok"}` -- a wrong key gets a `401` and Overland will
-keep retrying with the same (still-wrong) URL until you fix it on the
-phone.
+responds `{"result":"ok"}` -- a missing/wrong Access Token gets a `401`
+and Overland will keep retrying with the same (still-wrong) request until
+you fix it on the phone.
+
+**Not the URL-embedded `?device_id=&key=` scheme an earlier version of
+this README described** -- that leaked the shared secret into every
+server/proxy access log line for that request, which a header never
+does. If you're upgrading from that version, re-copy each device's
+Access Token into Overland's own field; the old query-string form no
+longer authenticates at all.
 
 ## Roles and permissions
 
@@ -213,3 +226,38 @@ Not verified: a real Overland-running iPhone (only the HTTP contract it
 uses was reproduced by hand) and the map page's own client-side Leaflet
 JS (no browser in this environment -- the data endpoint it fetches from
 was confirmed correct, but the map rendering itself wasn't screenshotted).
+
+### Follow-up: Overland's real Access Token field, not the URL
+
+The ingestion contract described above (query-string `device_id`/`key`)
+was wrong -- built without checking Overland's own docs first. Verified
+against [aaronpk/Overland-iOS](https://github.com/aaronpk/Overland-iOS)'s
+actual README directly and rebuilt around what it really has: a
+`Receiver URL` (no query string), a separate `Access Token` field sent as
+a real `Authorization: Bearer` header, and an optional, purely
+informational `Device ID`. `device_key` is `UNIQUE`, so the token alone
+identifies the device -- there's no longer a second identifier to trust
+or cross-check.
+
+Re-verified end to end against the same real MariaDB-backed instance: a
+correct Bearer token stores a real point under the server's own resolved
+device guid (never trusting anything the client's JSON body claims about
+which device it is); a wrong token, a missing `Authorization` header
+entirely, and the *old* query-string form (`?device_id=&key=`) all
+correctly return `401` now -- confirming the old scheme is fully retired,
+not just superseded in the UI. `Authorization` header extraction checks
+`getallheaders()`, `$_SERVER['HTTP_AUTHORIZATION']`, and
+`$_SERVER['REDIRECT_HTTP_AUTHORIZATION']` -- the last one specifically
+because Apache is known to move the header there after an internal
+rewrite (exactly what `web/.htaccess` does for every request), a real
+gotcha this sandbox's `php -S` dev server can't actually reproduce, so
+that specific fallback path is defensive/documented, not itself directly
+exercised.
+
+Also re-verified live in a real browser: the Devices page's new Receiver
+URL box and its copy button, and a small inline copy button this update
+adds next to each row's guid/device_key value -- clipboard contents
+confirmed correct for both, no accidental navigation. **Files**:
+`web/api_overland.php`, `web/devicesClassEx.php`, `web/index.php`,
+`web/classes/yaml/devices.yaml`, `web/templates/content/devices_list.zetem`,
+`web/js/devices.js`.

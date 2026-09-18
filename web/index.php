@@ -98,9 +98,12 @@ function zgt_profile($params) {
 function zgt_devices_list($params) {
     if (($errmsg = rbacClass::require(ZGT_PERM_DEVICES_MANAGE))) return $errmsg;
 
-    // rel_url() only ever returns a path -- Overland's own settings
-    // screen needs the full absolute URL to paste in, so the scheme/host
-    // are added by hand from the current request here.
+    // The exact, bare Receiver URL to paste into Overland -- no query
+    // string, since device identity/auth now travel as Overland's own
+    // separate Access Token field (Authorization: Bearer header) instead
+    // (see web/api_overland.php's own docblock for why). rel_url() only
+    // ever returns a path -- Overland's settings screen needs the full
+    // absolute URL, so scheme/host are added by hand from the request.
     $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
     $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $overlandBaseUrl = $scheme . '://' . $host . rel_url('/api/overland');
@@ -142,23 +145,6 @@ function devices_delete_url($guid, $fields) {
 
 function devices_edit_url($guid, $fields) {
     return rel_url('/devices/' . $guid . '/edit');
-}
-
-// Row-action `handler` for the Copy-link button (devices.yaml). Returns
-// the real, absolute per-device Overland Receiver URL (Overland's own
-// settings screen needs a full absolute URL, not a path -- same reason
-// zgt_devices_list() above builds its own generic hint the same way).
-// devices_list.zetem's JS intercepts a click on this button and copies
-// this exact URL to the clipboard instead of letting it navigate -- the
-// href is still a real, working URL underneath (falls through to
-// /api/overland's own 405/404 on a bare GET if JS or the Clipboard API
-// is unavailable, not a broken link).
-function devices_copy_url($guid, $fields) {
-    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
-    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
-    $deviceKey = $fields['device_key'] ?? '';
-    return $scheme . '://' . $host . rel_url('/api/overland')
-        . '?device_id=' . urlencode($guid) . '&key=' . urlencode($deviceKey);
 }
 
 function zgt_locations_table($params) {

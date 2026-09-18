@@ -1,10 +1,27 @@
 <h2 class="page-title">Devices</h2>
 
 <p class="hint">
-    For each device below, set the Overland iOS app's "Receiver URL" to:<br>
-    <code>{{ $overland_base_url | e }}?device_id=&lt;guid&gt;&amp;key=&lt;device_key&gt;</code><br>
-    using that device's own <strong>guid</strong> and <strong>device_key</strong> from the table below,
-    or just click the <i class="bx bx-copy"></i> button on a device's row to copy its exact link.
+    Set up each device in the Overland iOS app's settings with these 3 fields:
+</p>
+<ul class="hint-list">
+    <li>
+        <strong>Receiver URL</strong> -- the same for every device, no per-device parts:<br>
+        <code id="overland-receiver-url">{{ $overland_base_url | e }}</code>
+        <button type="button" class="icon-btn copy-value-btn" data-copy-value="{{ $overland_base_url | e }}" title="Copy Receiver URL"><i class="bx bx-copy"></i></button>
+    </li>
+    <li>
+        <strong>Access Token</strong> -- that device's own <strong>device_key</strong> from the table
+        below (Overland sends this back as the request's actual authentication).
+    </li>
+    <li>
+        <strong>Device ID</strong> (optional) -- that device's own <strong>guid</strong> from the
+        table below, purely so it's easy to recognize which device a point came from later; not
+        needed for authentication, since Access Token alone already identifies the device.
+    </li>
+</ul>
+<p class="hint">
+    Click the <i class="bx bx-copy"></i> button next to a guid/device_key value below to copy just
+    that value.
 </p>
 
 <div class="settings-table-scroll">{{ $devices_table }}</div>

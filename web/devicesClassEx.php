@@ -21,6 +21,20 @@ class devicesClassEx extends devicesClass {
         return $rows[0] ?? null;
     }
 
+    // Overland's own "Access Token" setting is sent as a real
+    // `Authorization: Bearer <token>` header (verified against
+    // aaronpk/Overland-iOS's own README -- an earlier version of this
+    // app wrongly assumed Overland had no separate auth field at all and
+    // baked device_id+key into the Receiver URL's query string instead;
+    // see web/api_overland.php's own docblock for why that was replaced).
+    // device_key is already `varchar(64) UNIQUE` (devices.yaml), so the
+    // token alone identifies the device -- no separate device_id lookup
+    // needed for authentication.
+    static function getByDeviceKey(string $deviceKey): ?devicesClass {
+        $rows = devicesClass::sgetAllFilter('devices', ['device_key' => $deviceKey]);
+        return $rows[0] ?? null;
+    }
+
     // Excludes soft-deleted rows -- callers that need to include them
     // (there are none today) should query devicesClass directly.
     static function getAllActive(): array {
