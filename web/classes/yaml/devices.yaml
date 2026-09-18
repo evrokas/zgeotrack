@@ -103,6 +103,17 @@ table_view:
 
   actions_label: "Actions"
   buttons:
+    # `type: custom` -- an edit/delete preset has no sensible default for
+    # this, so icon/tooltip are given explicitly (zeusfw_normalize_table_
+    # row_buttons(), core/maker/functions.php). `handler` resolves the
+    # href same as edit/delete's own do (FormElement.php's
+    # generateHTMLTableRowButton()) -- the actual "copy, don't navigate"
+    # behavior is JS-only, wired in devices_list.zetem against this
+    # button's own href, not anything new in core.
+    - type: custom
+      icon: "bx bx-copy"
+      tooltip: "Copy Overland link"
+      handler: devices_copy_url
     - type: edit
       handler: devices_edit_url
     - type: delete
