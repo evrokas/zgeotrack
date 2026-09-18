@@ -1,0 +1,114 @@
+---
+table:
+  name: devices
+  class: devicesClass
+  extention: __APPDIR__ . '/web/devicesClassEx.php'
+  fields:
+  - name: guid
+    type: '@guid'
+
+  - name: cdate
+    type: '@cdate'
+
+  - name: cuser
+    type: '@cuser'
+
+  - name: name
+    type: varchar(64)
+    required: true
+
+  # Shared secret Overland's "Receiver URL" carries as ?key=... -- 64 hex
+  # chars from random_bytes(32) (devicesClassEx::generateDeviceKey()).
+  # UNIQUE is baked into the type string itself, not a separate `unique:`
+  # option (createFieldDefinition() has none) -- same convention
+  # zeusfw core's ernsauth_sso_attempts.yaml already established, needed
+  # so the constraint survives every future spill:sql regeneration
+  # instead of a hand-added ALTER TABLE that doesn't.
+  - name: device_key
+    type: varchar(64) UNIQUE
+    required: true
+
+  - name: active
+    type: boolean
+    default: true
+
+  - name: notes
+    type: text
+
+  - name: deleted
+    type: '@delete'
+
+form:
+  name: devices
+  method: "post"
+  action: "#"
+
+  inputs:
+    - name: name
+      label: "Device name"
+      type: text
+
+    - name: notes
+      label: "Notes"
+      type: textarea
+
+    - name: active
+      label: "Active"
+      type: checkbox
+
+    # Never shown -- carries an existing row's guid back on submit so
+    # formsClass::storeFormResults() (zeusfw) updates that row instead of
+    # inserting a new one. Same convention as zpms's clinics.yaml.
+    - name: row_guid
+      type: hidden
+
+    # Also never shown. storeFormResults() (zeusfw core) only auto-fills
+    # guid/cdate/cuser on insert -- any other NOT NULL column (device_key
+    # here) that isn't a declared form input gets bound NULL and the
+    # INSERT fails outright. Declaring it as a hidden *input* instead
+    # routes it through the exact same $results-driven insert/update path
+    # as every other field: web/index.php's zgt_devices_list()/
+    # zgt_devices_row_edit() pre-fill this hidden value via renderForm()'s
+    # $default_values (a fresh devicesClassEx::generateDeviceKey() for a
+    # new device, the existing row's real key when editing), so it's
+    # simply present in $_POST like row_guid already is -- no core change,
+    # no $_SESSION['handler'] custom-save hook needed.
+    - name: device_key
+      type: hidden
+
+table_view:
+  default: table_default
+  table_default:
+    - name: name
+    - name: active
+    - name: guid
+    - name: device_key
+
+  actions_label: "Actions"
+  buttons:
+    - type: edit
+      handler: devices_edit_url
+    - type: delete
+      handler: devices_delete_url
+
+form_view:
+  default: view_full
+  view_full:
+    buttons:
+      - type: "submit"
+        label: "Submit"
+
+      - type: "reset"
+        label: "Reset"
+
+      - type: "button"
+        label: "Cancel"
+        action: "window.location.href='../devices';"
+
+    fields:
+      - name: name
+      - name: notes
+      - name: active
+      - name: row_guid
+      - name: device_key
+...

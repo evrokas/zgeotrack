@@ -1,0 +1,186 @@
+title: GeoTrack
+
+tz: "Europe/Athens"
+
+meta:
+  - charset="UTF-8"
+  - http-equiv="X-UA-Compatible" content="IE=edge"
+  - name="viewport" content="width=device-width, initial-scale=1.0"
+
+templates:
+  - './core/templates/'
+  - './templates/'
+
+css:
+  - styles:
+    src: 'css/styles.css'
+
+# Single-language deployment -- every string is written directly in the
+# .zetem templates rather than routed through t()/a dictionary, so there
+# is no per-app translation table to keep in sync (see zpms/erweb for the
+# bilingual convention this app deliberately skips).
+multilingual: false
+
+languages:
+  - en
+
+# Pseudo-roles ("anonymous", "authenticated") plus every real RBAC role
+# name this app seeds (bin/setup.php / web/rbac_seed.php) -- SecurityClass::
+# userIsPermitted() validates every route/region/modconf `access:` string
+# against this exact list, so a role used in one but missing here is a
+# fatal ("role is not configured correct"), not a silent deny.
+roles:
+  anonymous: []
+  authenticated: []
+  viewer: []
+  operator: []
+  administrator: []
+
+routes:
+  homepage:
+    title: "GeoTrack"
+    url: "/"
+    handler: homepage
+
+  login:
+    title: "Sign in"
+    url: "/login"
+    handler: login
+    method: get
+
+  login_post:
+    title: "Sign in"
+    url: "/login"
+    handler: login_post
+    method: post
+
+  logout:
+    title: "Sign out"
+    url: "/logout"
+    handler: logout
+
+  profile:
+    title: "My account"
+    url: "/profile"
+    handler: zgt_profile
+    access: authenticated
+
+  locations_table:
+    title: "Locations"
+    url: "/locations"
+    handler: zgt_locations_table
+    access: authenticated
+
+  devices_list:
+    title: "Devices"
+    url: "/devices"
+    handler: zgt_devices_list
+    access: authenticated
+
+  devices_row_edit:
+    title: "Edit device"
+    url: "/devices/{guid}/edit"
+    handler: zgt_devices_row_edit
+    method: get
+    access: authenticated
+
+  # formsClass::processform()/deleteFormRow() (zeusfw core) have no
+  # permission check of their own -- this route-level access: is what
+  # actually protects them, same convention as zpms's own webform routes.
+  # Every webform this app defines today (just `devices`) is gated on
+  # devices-manage internally (zgt_devices_list()/zgt_devices_row_edit()),
+  # so `operator` is the right floor here too.
+  webforms_post:
+    title: "Process form"
+    url: "/webform/processform/{guid}"
+    handler: formsClass::processform
+    method: post
+    access: operator administrator
+
+  webforms_view:
+    title: "View form"
+    url: "/webform/viewform/{formname}"
+    handler: formsClass::viewform
+    access: operator administrator
+
+  webforms_delete:
+    title: "Delete form row"
+    url: "/webform/delete/{formname}/{guid}"
+    handler: formsClass::deleteFormRow
+    method: post
+    access: operator administrator
+
+  # Session-authenticated JSON the map page's own JS fetches -- distinct
+  # from /api/overland below, which authenticates by device key instead
+  # of a login session.
+  api_locations_latest:
+    title: "Latest locations API"
+    url: "/api/locations/latest"
+    handler: zgt_api_locations_latest
+    method: get
+    access: authenticated
+
+  api_locations_track:
+    title: "Location track API"
+    url: "/api/locations/track/{device_guid}"
+    handler: zgt_api_locations_track
+    method: get
+    access: authenticated
+
+  # Overland iOS's own ingestion endpoint -- authenticated by device_id +
+  # key query params (see web/api_overland.php), not a login session, so
+  # deliberately no `access:` here.
+  overland_ingest:
+    title: "Overland ingestion API"
+    url: "/api/overland"
+    handler: zgt_overland_ingest
+    method: post
+
+regions:
+  # Same reasoning as zpms's own settings.info.yaml: region-level access:
+  # keeps the (logged-out) /login page a standalone page with no chrome,
+  # covering any future pre-auth route automatically.
+  - header:
+      access: authenticated
+  - main_navigation:
+      access: authenticated
+  - notification
+  - main_content
+
+structure:
+  header:
+    - userblock
+  main_navigation:
+    - mainnavigation
+  notification:
+    - notifications
+  main_content:
+    - content
+
+menu:
+  main:
+    - homepage:
+      text: "Map"
+      url: '/'
+    - locations_table:
+      text: "Table"
+      url: '/locations'
+    - devices_list:
+      text: "Devices"
+      url: '/devices'
+      access: operator administrator
+    - users_admin:
+      text: "Users & roles"
+      url: '/admin/users'
+      access: administrator
+
+modules:
+  path:
+    - "/web/core/modules/"
+    - "/web/modules/"
+  modules:
+    - mainnavigation
+    - notifications
+    - userblock
+    - content
+    - admin_crud

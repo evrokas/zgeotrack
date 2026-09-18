@@ -1,0 +1,21 @@
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+<div class="map-page">
+    <div class="map-sidebar">
+        <h2 class="page-title">Devices</h2>
+        {% if($device_count == 0): %}
+            <p class="empty-hint">No devices yet. <a href="{{rel_url('/devices')}}">Add one</a> to start tracking.</p>
+        {% else: %}
+        <ul class="device-list" id="device-list">
+            <!-- populated by js/map.js from /api/locations/latest -->
+        </ul>
+        {% endif %}
+        <p class="map-hint"><a href="{{rel_url('/locations')}}">View full location history &rarr;</a></p>
+    </div>
+    <div id="geotrack-map" class="map-canvas" data-locations-url="{{rel_url('/api/locations/latest')}}"></div>
+</div>
+
+<script src="{{rel_url('js/map.js')}}"></script>

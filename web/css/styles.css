@@ -1,0 +1,123 @@
+:root {
+    --gt-border: #d9dee3;
+    --gt-bg: #f7f8fa;
+    --gt-text: #1f2933;
+    --gt-accent: #2563eb;
+    --gt-danger: #dc2626;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--gt-text);
+    background: var(--gt-bg);
+}
+
+a { color: var(--gt-accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+.wrapper { min-height: 100vh; display: flex; flex-direction: column; }
+.wrapper-bare { display: block; }
+
+.topbar {
+    padding: 0.75rem 1.25rem;
+    background: #fff;
+    border-bottom: 1px solid var(--gt-border);
+}
+.topbar .brand { font-weight: 700; font-size: 1.1rem; color: var(--gt-text); }
+
+.region-header { background: #fff; border-bottom: 1px solid var(--gt-border); }
+.user-block { padding: 0.5rem 1.25rem; text-align: right; font-size: 0.9rem; }
+
+.region-main_navigation nav, .region-main_navigation ul {
+    display: flex;
+    gap: 1.25rem;
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 1.25rem;
+    background: #fff;
+    border-bottom: 1px solid var(--gt-border);
+}
+
+.region-notification { padding: 0 1.25rem; }
+.region-notification .warning { color: var(--gt-danger); }
+
+.region-main_content { flex: 1; padding: 1.25rem; }
+
+.page-title { margin-top: 0; }
+
+/* Login page */
+.login-page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--gt-bg);
+}
+.login-card {
+    background: #fff;
+    border: 1px solid var(--gt-border);
+    border-radius: 8px;
+    padding: 2rem;
+    width: 100%;
+    max-width: 320px;
+}
+.login-brand { text-align: center; margin: 0 0 0.25rem; }
+.login-subtitle { text-align: center; color: #6b7280; margin: 0 0 1.5rem; }
+.login-card .field { margin-bottom: 1rem; }
+.login-card label { display: block; margin-bottom: 0.25rem; font-size: 0.9rem; }
+.login-card input[type=text], .login-card input[type=password] {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid var(--gt-border);
+    border-radius: 4px;
+}
+.login-card .field-remember { display: flex; align-items: center; gap: 0.5rem; }
+.login-card .field-remember label { margin: 0; }
+.login-card .buttons button, button[type=submit] {
+    width: 100%;
+    padding: 0.6rem;
+    background: var(--gt-accent);
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+/* Map page */
+.map-page { display: flex; gap: 1rem; height: calc(100vh - 140px); min-height: 400px; }
+.map-sidebar { width: 260px; overflow-y: auto; }
+.map-canvas { flex: 1; border-radius: 6px; border: 1px solid var(--gt-border); }
+.device-list { list-style: none; margin: 0; padding: 0; }
+.device-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.25rem;
+    border-bottom: 1px solid var(--gt-border);
+    cursor: pointer;
+}
+.device-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.device-name { flex: 1; }
+.device-lastseen { font-size: 0.8rem; color: #6b7280; }
+.empty-hint { color: #6b7280; }
+
+/* Locations table */
+.filter-bar { margin-bottom: 1rem; }
+.filter-bar select { padding: 0.4rem; border: 1px solid var(--gt-border); border-radius: 4px; }
+.locations-table { border-collapse: collapse; width: 100%; background: #fff; }
+.locations-table th, .locations-table td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--gt-border);
+    font-size: 0.9rem;
+}
+.pagination { margin-top: 1rem; }
+
+/* Devices / webform table (generic core webform markup) */
+.settings-table-scroll { overflow-x: auto; background: #fff; }
+.hint { background: #fff; border: 1px solid var(--gt-border); border-radius: 6px; padding: 0.75rem 1rem; }
+.hint code { background: var(--gt-bg); padding: 0.1rem 0.3rem; border-radius: 3px; }

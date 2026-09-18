@@ -1,0 +1,28 @@
+# Zeus Framework
+# GeoTrack site configuration file
+
+# set to 1 to enable php_display_errors
+php_display_errors: 1
+
+# set to 1 to enable php_display_startup_errors
+php_display_startup_errors: 1
+
+# set to 1 to enable comments in produced .html file (default: 0)
+enable_template_comments: 0
+
+# set to 1 to enable cache in produced templates
+enable_template_cache: 0
+
+# path for cache (used when 'enable_template_cache' is set to 1)
+template_cache_path: "cache/"
+
+# library path for stored files (currently unused -- no file uploads in
+# this app -- kept only because core's Kernel reads it unconditionally)
+libpath: files/
+
+# Turn off optional framework-provided packages for this site/deployment
+# by listing their package name here -- see zeusfw's core/lib/Packages.php.
+# `admin_user_crud` (the /admin/{entity} users/roles/permissions UI) is
+# enabled by default and actively used (see README.md's "Roles and
+# permissions" section), so it stays out of this list.
+disabled_packages: []

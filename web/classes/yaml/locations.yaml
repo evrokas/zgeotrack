@@ -1,0 +1,83 @@
+---
+# GPS pings ingested from the Overland iOS app (see web/api_overland.php).
+# Never created/edited through a webform -- no form:/table_view:/form_view:
+# blocks, unlike devices.yaml -- read/written entirely through
+# locationsClassEx and the raw SQL it wraps (web/devicesClassEx.php).
+#
+# Known scale limitation, not a bug: this table has no secondary index on
+# (device_guid, recorded_at) -- maker's createFieldDefinition() has no
+# `index:` option beyond the UNIQUE-in-type-string trick devices.yaml
+# uses, and that trick only produces a single-column unique index, not a
+# composite lookup index. Every query in locationsClassEx.php currently
+# filters/sorts on exactly that pair (see e.g. getLatestPerDevice()) --
+# fine at the row counts a handful of Overland-reporting phones produce
+# over months, but a real problem once this table reaches the millions of
+# rows a always-on multi-device deployment eventually will. Add the index
+# by hand (`ALTER TABLE locations ADD INDEX idx_device_recorded
+# (device_guid, recorded_at)`) directly against the database if/when query
+# latency becomes noticeable -- it will survive a future spill:sql run
+# just fine (spill:sql only emits CREATE TABLE from this yaml, it doesn't
+# drop indexes the yaml never declared), but it won't be re-created on a
+# fresh install unless someone remembers to run it there too.
+table:
+  name: locations
+  class: locationsClass
+  extention: __APPDIR__ . '/web/locationsClassEx.php'
+  fields:
+  - name: guid
+    type: '@guid'
+
+  # Server-side insert time -- see recorded_at below for the
+  # device-reported timestamp actually used for sorting/display.
+  - name: cdate
+    type: '@cdate'
+
+  # References devices.guid by convention only -- no DB-level FK, same
+  # "referential integrity is app-level only" convention every other
+  # table in this framework already follows.
+  - name: device_guid
+    type: char(36)
+    required: true
+
+  - name: recorded_at
+    type: datetime
+    required: true
+
+  - name: lat
+    type: decimal(10,7)
+    required: true
+
+  - name: lon
+    type: decimal(10,7)
+    required: true
+
+  - name: altitude
+    type: decimal(8,2)
+
+  - name: speed
+    type: decimal(8,2)
+
+  - name: accuracy
+    type: decimal(8,2)
+
+  # Overland reports 0..1; kept as a fraction rather than rescaled to a
+  # percentage so it round-trips exactly against the source payload.
+  - name: battery_level
+    type: decimal(5,4)
+
+  - name: battery_state
+    type: varchar(16)
+
+  # Overland's "motion" property is an array (e.g. ["driving"]) --
+  # imploded with ',' on insert (locationsClassEx::insertFromOverlandPoint()),
+  # exploded back out only for display, never queried on.
+  - name: motion
+    type: varchar(128)
+
+  # The full, untouched properties object for this point, as received --
+  # forward-compat with any Overland field this schema doesn't have its
+  # own column for, and a debugging aid if a device ever sends something
+  # unexpected. Never parsed back out at query time.
+  - name: raw
+    type: text
+...

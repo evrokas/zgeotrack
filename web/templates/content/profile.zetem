@@ -1,0 +1,15 @@
+<h2 class="page-title">My account</h2>
+
+<p>Signed in as <strong>{{ $display_name | e }}</strong>.</p>
+
+<p>
+    <a href="{{rel_url('/')}}">Map</a> &middot;
+    <a href="{{rel_url('/locations')}}">Location history</a>
+    {% if($can_manage_devices): %}
+        &middot; <a href="{{rel_url('/devices')}}">Devices</a>
+    {% endif %}
+    {% if($can_manage_users): %}
+        &middot; <a href="{{rel_url('/admin/users')}}">Users &amp; roles</a>
+    {% endif %}
+    &middot; <a href="{{rel_url('/logout')}}">Sign out</a>
+</p>

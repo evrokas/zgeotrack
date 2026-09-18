@@ -1,0 +1,17 @@
+{# header/main_navigation carry access: authenticated in
+   config/settings.info.yaml's regions: list, so both already render as ''
+   for a logged-out visitor (Kernel::renderRegion()) -- the only thing
+   left to derive is whether to add wrapper-bare, so .login-page's own
+   CSS knows there's no chrome around it to leave room for. Same
+   mechanism zpms's own page.zetem override uses. #}
+{% $__bareLayout = trim(($regions['header'] ?? '') . ($regions['main_navigation'] ?? '')) === ''; %}
+<div class="wrapper{% if($__bareLayout): %} wrapper-bare{% endif %}">
+    {% if(!$__bareLayout): %}
+    <div class="topbar">
+        <a class="brand" href="{{rel_url('/')}}">GeoTrack</a>
+    </div>
+    {% endif %}
+    {% foreach($regions as $reg): %}
+        {{ $reg }}
+    {% endforeach %}
+</div>

@@ -1,0 +1,52 @@
+<div class="locations-page">
+    <h2 class="page-title">Location history</h2>
+
+    <form class="filter-bar" method="get" action="{{rel_url('/locations')}}">
+        <label for="device">Device</label>
+        <select name="device" id="device" onchange="this.form.submit()">
+            <option value="">All devices</option>
+            {% foreach($devices as $d): %}
+            <option value="{{ $d->getguid() | e }}" {% if($selected_device_guid === $d->getguid()): %}selected{% endif %}>
+                {{ $d->getname() | e }}
+            </option>
+            {% endforeach %}
+        </select>
+    </form>
+
+    {% if(count($rows) == 0): %}
+        <p class="empty-hint">No location data yet.</p>
+    {% else: %}
+    <table class="locations-table">
+        <thead>
+            <tr>
+                <th>Device</th>
+                <th>Recorded at</th>
+                <th>Latitude</th>
+                <th>Longitude</th>
+                <th>Speed (m/s)</th>
+                <th>Altitude (m)</th>
+                <th>Battery</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% foreach($rows as $r): %}
+            <tr>
+                <td>{{ $r['device_name'] | e }}</td>
+                <td>{{ $r['recorded_at'] | e }}</td>
+                <td>{{ $r['lat'] | e }}</td>
+                <td>{{ $r['lon'] | e }}</td>
+                <td>{% if($r['speed'] !== null): %}{{ $r['speed'] | e }}{% else: %}&mdash;{% endif %}</td>
+                <td>{% if($r['altitude'] !== null): %}{{ $r['altitude'] | e }}{% else: %}&mdash;{% endif %}</td>
+                <td>{% if($r['battery_level'] !== null): %}{{ $r['battery_pct'] | e }}%{% else: %}&mdash;{% endif %}</td>
+            </tr>
+            {% endforeach %}
+        </tbody>
+    </table>
+
+    {% if($has_more): %}
+    <p class="pagination">
+        <a href="{{rel_url('/locations') . '?' . http_build_query(['device' => $selected_device_guid, 'before' => $next_before])}}">Older &rarr;</a>
+    </p>
+    {% endif %}
+    {% endif %}
+</div>

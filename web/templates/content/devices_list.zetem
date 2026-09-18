@@ -1,0 +1,14 @@
+<h2 class="page-title">Devices</h2>
+
+<p class="hint">
+    For each device below, set the Overland iOS app's "Receiver URL" to:<br>
+    <code>{{ $overland_base_url | e }}?device_id=&lt;guid&gt;&amp;key=&lt;device_key&gt;</code><br>
+    using that device's own <strong>guid</strong> and <strong>device_key</strong> from the table below.
+</p>
+
+<div class="settings-table-scroll">{{ $devices_table }}</div>
+
+<hr>
+
+<h3>Add a device</h3>
+{{ $devices_form }}

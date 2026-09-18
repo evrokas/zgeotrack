@@ -1,0 +1,28 @@
+<div class="login-page">
+    <div class="login-card">
+        <h1 class="login-brand">GeoTrack</h1>
+        <p class="login-subtitle">Sign in to view device locations</p>
+
+        <form action="{{$action}}" method="post">
+            {{ csrf_field() }}
+            <div class="field">
+                <label for="username">Username</label>
+                <input type="text" name="username" id="username" autocomplete="username" autofocus>
+            </div>
+
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" name="password" id="password" autocomplete="current-password">
+            </div>
+
+            <div class="field field-remember">
+                <input type="checkbox" name="rememberme" id="rememberme">
+                <label for="rememberme">Remember me</label>
+            </div>
+
+            <div class="buttons">
+                <button type="submit">Sign in</button>
+            </div>
+        </form>
+    </div>
+</div>
