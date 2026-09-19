@@ -67,8 +67,28 @@ function zgt_api_locations_track($params) {
     // Defaults to the last 24 hours -- the map's own "show track" feature
     // is meant for "where has this device been recently", not a full
     // history dump (that's what /locations, the table page, is for).
+    //
+    // `minutes=N` is the map page's own preferred way to ask for this
+    // (js/map.js's time-window buttons -- 1/5/20/40/60/90 minutes) rather
+    // than computing an explicit `from` client-side: `date()` here runs in
+    // whatever timezone Kernel::__construct() set from config/
+    // settings.info.yaml's `tz:` (Europe/Athens), which has no reason to
+    // match a visitor's own browser/device timezone -- computing `from` in
+    // the browser and sending it as a wall-clock string risked silently
+    // asking for the wrong window (or, worse, a window that looks
+    // plausible but is off by the visitor's UTC offset). Doing the
+    // subtraction here, against the server's own `now()`, sidesteps that
+    // entirely. `from`/`to` stay supported as explicit overrides for any
+    // other caller that already knows the exact range it wants.
     $to = isset($_GET['to']) ? (string)$_GET['to'] : date('Y-m-d H:i:s');
-    $from = isset($_GET['from']) ? (string)$_GET['from'] : date('Y-m-d H:i:s', strtotime($to) - 86400);
+    if (isset($_GET['from'])) {
+        $from = (string)$_GET['from'];
+    } elseif (isset($_GET['minutes']) && is_numeric($_GET['minutes'])) {
+        $minutes = max(1, (int)$_GET['minutes']);
+        $from = date('Y-m-d H:i:s', strtotime($to) - $minutes * 60);
+    } else {
+        $from = date('Y-m-d H:i:s', strtotime($to) - 86400);
+    }
 
     $points = [];
     foreach (locationsClassEx::getForDeviceRange($deviceGuid, $from, $to) as $loc) {

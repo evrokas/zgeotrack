@@ -89,8 +89,21 @@ a:hover { text-decoration: underline; }
 
 /* Map page */
 .map-page { display: flex; gap: 1rem; height: calc(100vh - 140px); min-height: 400px; }
-.map-sidebar { width: 260px; overflow-y: auto; }
-.map-canvas { flex: 1; border-radius: 6px; border: 1px solid var(--gt-border); }
+.map-sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; }
+.map-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.map-window-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.map-window-btn {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.85rem;
+    border: 1px solid var(--gt-border);
+    border-radius: 999px;
+    background: #fff;
+    color: var(--gt-text);
+    cursor: pointer;
+}
+.map-window-btn:hover { background: var(--gt-bg); }
+.map-window-btn.active { background: var(--gt-accent); border-color: var(--gt-accent); color: #fff; }
+.map-canvas { flex: 1; min-height: 0; border-radius: 6px; border: 1px solid var(--gt-border); }
 .device-list { list-style: none; margin: 0; padding: 0; }
 .device-item {
     display: flex;
@@ -121,3 +134,25 @@ a:hover { text-decoration: underline; }
 .settings-table-scroll { overflow-x: auto; background: #fff; }
 .hint { background: #fff; border: 1px solid var(--gt-border); border-radius: 6px; padding: 0.75rem 1rem; }
 .hint code { background: var(--gt-bg); padding: 0.1rem 0.3rem; border-radius: 3px; }
+
+/* This stylesheet had zero @media queries before -- confirmed live, not
+   assumed: on a real 390px-wide phone viewport, .map-page's side-by-side
+   flex layout left .map-canvas exactly 74px wide (.map-sidebar's fixed
+   260px plus the row gap ate almost the entire viewport), the map
+   effectively unusable. Below this breakpoint the two stack vertically
+   instead, each at the full available width -- the sidebar capped to a
+   third of the viewport height (device list still reachable without
+   pushing the map itself below the fold) and the map given the rest. */
+@media (max-width: 768px) {
+    .map-page { flex-direction: column; height: auto; min-height: 0; }
+    /* `flex: none` on both: the base rules' `flex: 1`/`flex-shrink: 0`
+       set a flex-basis that overrides a plain `height`/`max-height` on a
+       column flex item (confirmed live -- .map-canvas rendered at 2px
+       tall with just `height: 60vh` added on top of the unchanged base
+       `flex: 1; min-height: 0`, the explicit height silently losing to
+       flex-basis: 0%). Turning flex sizing off lets the explicit heights
+       below actually apply. */
+    .map-sidebar { width: 100%; flex: none; max-height: 30vh; }
+    .map-main { width: 100%; flex: none; }
+    .map-canvas { flex: none; height: 60vh; }
+}

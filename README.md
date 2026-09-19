@@ -15,7 +15,10 @@ just consumes it" pattern zpms/erweb already use.
 - Each point is stored in a `locations` table, tagged with the device
   that sent it.
 - Logged-in users see a live map (`/`) of every device's most recent fix,
-  and a searchable/paginated history table (`/locations`).
+  refreshed automatically every 20s, plus a time-window selector (Live,
+  1m, 5m, 20m, 40m, 60m, 90m) that overlays each device's own recent
+  track as a colored line for that window -- and a searchable/paginated
+  history table (`/locations`).
 - An `operator`/`administrator` account manages devices at `/devices`
   (create/rename/disable, and see each device's Overland setup URL) and
   users/roles at `/admin/{users,roles,permissions,role_permissions,user_roles}`
@@ -261,3 +264,63 @@ confirmed correct for both, no accidental navigation. **Files**:
 `web/api_overland.php`, `web/devicesClassEx.php`, `web/index.php`,
 `web/classes/yaml/devices.yaml`, `web/templates/content/devices_list.zetem`,
 `web/js/devices.js`.
+
+### Follow-up: "remember me" fixed (framework-level), historical map trails, mobile layout
+
+Three reports handled together, since two turned out related once actually investigated:
+
+**"Remember me doesn't work"** -- a real bug in zeusfw core itself, not this app (see zeusfw's own
+`CLAUDE.md` for the full writeup). The literal IP filter people expected to be the cause was already
+removed in an earlier fix; a second, equally strict filter on **user-agent** sat one step further down
+the same cookie-validation path and had been missed -- any UA drift between issuing the remember-me
+cookie and using it later (an app update, a browser/OS update, a different WebView) silently failed the
+whole auto-login, with zero error message. A second bug in the same function meant even a successful
+restore could carry the wrong RBAC roles. Reproduced the failure first (a valid cookie + a different
+User-Agent + no session correctly bounced to `/login`) against a disposable checkout of the pre-fix
+code, then confirmed the fix resolves it (a real `/devices` load, 200, real content) against this same
+MariaDB-backed instance. Nothing in this app itself needed to change -- pull the fixed `fw/` checkout.
+
+**Historical map trails** -- `/api/locations/track/{device_guid}` already existed (built for exactly
+this, per its own docblock) but was never wired into the map page. Added `minutes=N` as an alternative
+to explicit `from`/`to` (computed server-side against the server's own `now()`, deliberately -- see
+`web/api_locations.php`'s own comment on why computing this in the visitor's browser and sending a
+timezone-naive string risked silently asking for the wrong window), a row of time-window buttons (Live,
+1m, 5m, 20m, 40m, 60m, 90m) above the map, and a colored polyline per device for whichever window is
+selected. The map now also polls `/api/locations/latest` every 20s on its own, so "Live" actually means
+something rather than a snapshot frozen at page load.
+
+Verified two ways, since this sandbox's outbound-HTTPS policy blocks every CDN (`unpkg.com`, `jsdelivr`,
+`cdnjs`), including the one this page's own Leaflet `<script>` tag already used -- a real Leaflet map
+was never something this environment could render, not this feature's own limitation: (1) the server's
+own `minutes=` computation, directly, against real points posted through the actual `/api/overland`
+ingestion endpoint (not hand-inserted SQL -- an early attempt at that produced a false failure, traced
+to MySQL's `NOW()` being UTC while this app's own PHP-side timestamp handling runs in `Europe/Athens,`
+config's `tz:` -- self-consistent for real ingested data, since both sides go through the same `date()`
+call, but not for a raw `NOW()`-seeded row): `minutes=1/5/20/40/60/90` against 6 points spaced
+2/8/15/35/55/85 minutes apart returned exactly 0/1/3/4/5/6 points, matching what each window should
+contain. (2) `web/js/map.js` itself, run directly in Node against a minimal stub standing in for the
+`L` (Leaflet) global -- confirmed the real file builds all 7 buttons, and that clicking "60m" fetches
+exactly `/api/locations/track/<guid>?minutes=60` and would hand `L.polyline()` the correct point pairs.
+Also hardened while doing this: the whole page's script used to die on its very first line if Leaflet's
+CDN was ever slow/unreachable (`L is not defined`, an uncaught exception) -- the window buttons and the
+device sidebar list no longer depend on Leaflet having loaded at all, confirmed live under the exact
+CDN-blocked condition this sandbox already forces.
+
+**Mobile layout was confined to a sliver, not full width** -- this stylesheet had zero `@media` queries
+at all before now. Confirmed live at a real 390px phone viewport: `.map-canvas` rendered **74px** wide
+(`.map-sidebar`'s fixed 260px left almost nothing), effectively unusable. Added a `max-width: 768px`
+breakpoint stacking the sidebar above the map instead of beside it, both at full available width. A
+first attempt at the breakpoint's own CSS had a second bug, also only caught by measuring the real
+rendered page rather than reading the CSS: `.map-canvas`'s base `flex: 1` set a `flex-basis` that
+silently overrode the media query's own explicit `height: 60vh` (rendered 2px tall) -- fixed by turning
+off flex-sizing (`flex: none`) on the stacked elements so the explicit heights actually apply. Re-measured
+after the fix: full-width `.map-canvas` at a real, usable height, zero horizontal page overflow.
+
+**Known, disclosed, not fixed**: the framework's own hamburger-menu nav (`core/templates/nav/
+main_navigation.zetem`) is a pure checkbox-driven CSS toggle that core deliberately ships unstyled (see
+zeusfw's own "bare unstyled fallback, app can override" convention) -- this app never added the CSS to
+make it actually toggle, so the raw checkboxes/icons show up uncollapsed on narrow screens (visible in
+the mobile screenshots taken while verifying the fix above). Pre-existing, not touched by this pass,
+and not what was reported -- flagged here rather than fixed silently or left unmentioned. **Files**:
+`zeusfw/core/ClassExFW.php`, `zeusfw/core/kernel/Kernel.php` (remember-me, separate repo),
+`web/api_locations.php`, `web/js/map.js`, `web/templates/content/homepage.zetem`, `web/css/styles.css`.
