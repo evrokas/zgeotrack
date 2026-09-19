@@ -3,10 +3,67 @@
 
     var PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d'];
 
-    // Minutes shown as buttons alongside "Live" -- the exact set asked
-    // for (1, 5, 20, 40, 60, 90). 0 means "Live": just each device's
-    // current position, no trail, same as this page's original behavior.
-    var WINDOWS = [0, 1, 5, 20, 40, 60, 90];
+    // Every time-window option, grouped for the <select>'s <optgroup>s.
+    // Each entry resolves to either a `minutes` value (a plain rolling
+    // duration -- reuses /api/locations/track's existing `minutes=N`,
+    // computed server-side against the server's own clock) or a
+    // `calendar` key ('lastweek'/'lastmonth' -- genuinely calendar-bound,
+    // not expressible as "N minutes ago"; see web/api_locations.php's own
+    // zgt_calendar_range()). 'live' (no group) means no trail at all --
+    // just each device's current position, this page's original behavior.
+    //
+    // 60m and 1h (and 1440m/1d) are literally the same duration -- kept
+    // as a single entry with the more natural label at that scale (1h,
+    // not 60m) rather than two buttons for one duration.
+    var WINDOW_GROUPS = [
+        {
+            group: null,
+            options: [{ key: 'live', label: 'Live' }]
+        },
+        {
+            group: 'Minutes',
+            options: [
+                { key: 'min-1', label: '1 minute', minutes: 1 },
+                { key: 'min-5', label: '5 minutes', minutes: 5 },
+                { key: 'min-20', label: '20 minutes', minutes: 20 },
+                { key: 'min-40', label: '40 minutes', minutes: 40 }
+            ]
+        },
+        {
+            group: 'Hours',
+            options: [
+                { key: 'h-1', label: '1 hour', minutes: 60 },
+                { key: 'h-1.5', label: '1.5 hours', minutes: 90 },
+                { key: 'h-2', label: '2 hours', minutes: 120 },
+                { key: 'h-6', label: '6 hours', minutes: 360 },
+                { key: 'h-12', label: '12 hours', minutes: 720 }
+            ]
+        },
+        {
+            group: 'Days',
+            options: [
+                { key: 'd-1', label: '1 day', minutes: 1440 },
+                { key: 'd-2', label: '2 days', minutes: 2880 },
+                { key: 'd-5', label: '5 days', minutes: 7200 }
+            ]
+        },
+        {
+            group: 'Calendar',
+            options: [
+                { key: 'week', label: 'Last 7 days', minutes: 10080 },
+                { key: 'lastweek', label: 'Last week (Mon-Sun)', calendar: 'lastweek' },
+                { key: 'month', label: 'Last 30 days', minutes: 43200 },
+                { key: 'lastmonth', label: 'Last month', calendar: 'lastmonth' }
+            ]
+        }
+    ];
+
+    // Flat key -> option lookup, built once, so refreshTracks() doesn't
+    // need to re-walk the grouped structure on every call.
+    var WINDOWS_BY_KEY = {};
+    WINDOW_GROUPS.forEach(function (g) {
+        g.options.forEach(function (opt) { WINDOWS_BY_KEY[opt.key] = opt; });
+    });
 
     // How often the map re-polls while left open, so "Live" actually
     // means something rather than a one-time snapshot at page load.
@@ -29,10 +86,6 @@
         return Math.round(diffSeconds / 86400) + 'd ago';
     }
 
-    function windowLabel(minutes) {
-        return minutes === 0 ? 'Live' : minutes + 'm';
-    }
-
     function escapeHtml(s) {
         var div = document.createElement('div');
         div.textContent = s;
@@ -44,40 +97,42 @@
         if (!mapEl) return;
 
         var listEl = document.getElementById('device-list');
-        var windowButtonsEl = document.getElementById('map-window-buttons');
+        var windowSelectEl = document.getElementById('map-window-select');
         var locationsUrl = mapEl.getAttribute('data-locations-url');
         var trackUrlTemplate = mapEl.getAttribute('data-track-url-template'); // has __GUID__ placeholder
 
         var markers = {};       // device_guid -> current-position circleMarker
-        var trackLines = {};    // device_guid -> polyline (only while a window > 0 is active)
+        var trackLines = {};    // device_guid -> polyline (only while a window other than 'live' is active)
         var latestDevices = []; // last-fetched /api/locations/latest response
-        var currentWindow = 0;  // 0 = Live (no trail)
+        var currentWindow = 'live';
         var hasFitBoundsOnce = false;
 
         // Built before Leaflet is ever touched, and independent of it --
         // none of this needs a map instance to exist. If the Leaflet CDN
         // is ever slow/unreachable for a real visitor (this app loads it
         // from unpkg.com, a single external host with no local fallback),
-        // the window buttons and the device sidebar should still work
+        // the window selector and the device sidebar should still work
         // rather than the whole script dying on the very first line that
         // touches the (then-undefined) `L` global.
-        function buildWindowButtons() {
-            if (!windowButtonsEl) return;
-            WINDOWS.forEach(function (minutes) {
-                var btn = document.createElement('button');
-                btn.type = 'button';
-                btn.className = 'map-window-btn' + (minutes === currentWindow ? ' active' : '');
-                btn.textContent = windowLabel(minutes);
-                btn.setAttribute('data-minutes', String(minutes));
-                btn.addEventListener('click', function () {
-                    if (minutes === currentWindow) return;
-                    currentWindow = minutes;
-                    windowButtonsEl.querySelectorAll('.map-window-btn').forEach(function (b) {
-                        b.classList.toggle('active', b === btn);
-                    });
-                    refreshTracks();
+        function buildWindowSelect() {
+            if (!windowSelectEl) return;
+            WINDOW_GROUPS.forEach(function (g) {
+                var container = windowSelectEl;
+                if (g.group) {
+                    container = document.createElement('optgroup');
+                    container.label = g.group;
+                    windowSelectEl.appendChild(container);
+                }
+                g.options.forEach(function (opt) {
+                    var optionEl = document.createElement('option');
+                    optionEl.value = opt.key;
+                    optionEl.textContent = opt.label;
+                    container.appendChild(optionEl);
                 });
-                windowButtonsEl.appendChild(btn);
+            });
+            windowSelectEl.addEventListener('change', function () {
+                currentWindow = windowSelectEl.value;
+                refreshTracks();
             });
         }
 
@@ -91,7 +146,7 @@
         } catch (err) {
             // Leaflet itself didn't load (CDN unreachable, blocked, or
             // slow) -- every function below already checks `map` before
-            // touching it, so the rest of the page (buttons, sidebar
+            // touching it, so the rest of the page (selector, sidebar
             // list data) still works; only the actual map canvas doesn't.
             console.error('GeoTrack: Leaflet failed to initialize -- the map itself will be unavailable', err);
         }
@@ -107,11 +162,17 @@
         function refreshTracks() {
             if (!map) return;
             clearTracks();
-            if (currentWindow === 0 || !trackUrlTemplate) return;
+
+            var windowDef = WINDOWS_BY_KEY[currentWindow];
+            if (!windowDef || currentWindow === 'live' || !trackUrlTemplate) return;
+
+            var query = windowDef.calendar
+                ? 'calendar=' + encodeURIComponent(windowDef.calendar)
+                : 'minutes=' + windowDef.minutes;
 
             latestDevices.forEach(function (d) {
                 var url = trackUrlTemplate.replace('__GUID__', encodeURIComponent(d.device_guid))
-                    + '?minutes=' + currentWindow;
+                    + '?' + query;
 
                 fetch(url, { headers: { 'Accept': 'application/json' } })
                     .then(function (res) { return res.json(); })
@@ -224,7 +285,7 @@
                 });
         }
 
-        buildWindowButtons();
+        buildWindowSelect();
         refreshLatest();
         setInterval(refreshLatest, REFRESH_MS);
     });

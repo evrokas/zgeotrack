@@ -83,6 +83,18 @@ function zgt_api_locations_track($params) {
     $to = isset($_GET['to']) ? (string)$_GET['to'] : date('Y-m-d H:i:s');
     if (isset($_GET['from'])) {
         $from = (string)$_GET['from'];
+    } elseif (isset($_GET['calendar'])) {
+        // The map page's time-window dropdown has two entries that aren't
+        // expressible as "N minutes/hours before now" at all -- "Last
+        // week"/"Last month" mean the previous *calendar* week/month,
+        // wherever "now" happens to fall inside the current one. Every
+        // other window on that dropdown (1h/2h/.../30 days) is a plain
+        // rolling duration and stays on the `minutes=` path below,
+        // unchanged -- this branch only exists for the two that
+        // genuinely need calendar-boundary math, computed here against
+        // the server's own `now()` for the same timezone-consistency
+        // reason `minutes=` already documented above.
+        [$from, $to] = zgt_calendar_range((string)$_GET['calendar']);
     } elseif (isset($_GET['minutes']) && is_numeric($_GET['minutes'])) {
         $minutes = max(1, (int)$_GET['minutes']);
         $from = date('Y-m-d H:i:s', strtotime($to) - $minutes * 60);
@@ -101,4 +113,38 @@ function zgt_api_locations_track($params) {
 
     echo json_encode(['device_name' => $device->getname(), 'points' => $points]);
     exit();
+}
+
+// [$from, $to] ('Y-m-d H:i:s' strings, inclusive) for zgt_api_locations_track()'s
+// `calendar=` param. Weeks are ISO (Monday start) -- there's no other
+// week-start convention anywhere in this app to match, and Monday-start
+// is the standard default absent one. "Last week"/"last month" both mean
+// the previous full calendar period relative to the server's own `now()`
+// (already active-timezone-correct by construction, since every
+// `strtotime()`/`date()` call here runs through the same tz `minutes=`
+// already relies on) -- never the visitor's own, which this endpoint has
+// no reliable way to know.
+function zgt_calendar_range(string $which): array {
+    $now = time();
+
+    if ($which === 'lastweek') {
+        $dayOfWeek = (int)date('N', $now); // 1 (Mon) .. 7 (Sun)
+        $thisMonday = strtotime('-' . ($dayOfWeek - 1) . ' days', strtotime(date('Y-m-d', $now)));
+        $lastMonday = strtotime('-7 days', $thisMonday);
+        $lastSunday = strtotime('-1 day', $thisMonday);
+        return [date('Y-m-d 00:00:00', $lastMonday), date('Y-m-d 23:59:59', $lastSunday)];
+    }
+
+    if ($which === 'lastmonth') {
+        $firstOfThisMonth = strtotime(date('Y-m-01', $now));
+        $firstOfLastMonth = strtotime('-1 month', $firstOfThisMonth);
+        $lastOfLastMonth = strtotime('-1 day', $firstOfThisMonth);
+        return [date('Y-m-d 00:00:00', $firstOfLastMonth), date('Y-m-d 23:59:59', $lastOfLastMonth)];
+    }
+
+    // Unknown value -- fail toward "no data" (an empty, valid range) same
+    // as this endpoint's other inputs never fall through to a fatal
+    // error for a malformed request; the map's own dropdown never sends
+    // anything but 'lastweek'/'lastmonth' into this branch to begin with.
+    return [date('Y-m-d H:i:s', $now), date('Y-m-d H:i:s', $now)];
 }

@@ -16,8 +16,11 @@
         <p class="map-hint"><a href="{{rel_url('/locations')}}">View full location history &rarr;</a></p>
     </div>
     <div class="map-main">
-        <div class="map-window-row" id="map-window-buttons">
-            <!-- populated by js/map.js: Live, 1m, 5m, 20m, 40m, 60m, 90m -->
+        <div class="map-window-row">
+            <label for="map-window-select">Show:</label>
+            <select id="map-window-select">
+                <!-- populated by js/map.js: Live, then Minutes/Hours/Days/Calendar optgroups -->
+            </select>
         </div>
         <div id="geotrack-map" class="map-canvas"
             data-locations-url="{{rel_url('/api/locations/latest')}}"

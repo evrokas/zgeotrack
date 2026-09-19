@@ -15,10 +15,11 @@ just consumes it" pattern zpms/erweb already use.
 - Each point is stored in a `locations` table, tagged with the device
   that sent it.
 - Logged-in users see a live map (`/`) of every device's most recent fix,
-  refreshed automatically every 20s, plus a time-window selector (Live,
-  1m, 5m, 20m, 40m, 60m, 90m) that overlays each device's own recent
-  track as a colored line for that window -- and a searchable/paginated
-  history table (`/locations`).
+  refreshed automatically every 20s, plus a time-window dropdown (Live;
+  1/5/20/40 minutes; 1/1.5/2/6/12 hours; 1/2/5 days; last 7 days; last
+  week [calendar, Mon-Sun]; last 30 days; last month [calendar]) that
+  overlays each device's own recent track as a colored line for that
+  window -- and a searchable/paginated history table (`/locations`).
 - An `operator`/`administrator` account manages devices at `/devices`
   (create/rename/disable, and see each device's Overland setup URL) and
   users/roles at `/admin/{users,roles,permissions,role_permissions,user_roles}`
@@ -324,3 +325,38 @@ the mobile screenshots taken while verifying the fix above). Pre-existing, not t
 and not what was reported -- flagged here rather than fixed silently or left unmentioned. **Files**:
 `zeusfw/core/ClassExFW.php`, `zeusfw/core/kernel/Kernel.php` (remember-me, separate repo),
 `web/api_locations.php`, `web/js/map.js`, `web/templates/content/homepage.zetem`, `web/css/styles.css`.
+
+### Follow-up, same day: many more time windows -- hours, days, and real calendar weeks/months
+
+The original 6-button set (1/5/20/40/60/90 minutes) grew to 17 options (1/5/20/40 minutes;
+1/1.5/2/6/12 hours; 1/2/5 days; last 7 days; last calendar week; last 30 days; last calendar month) --
+too many for the original pill-button row to stay usable, so that row became a single `<select>` with
+`<optgroup>`s instead (Minutes/Hours/Days/Calendar). 60m and 1h (and 1440m/1d) are the same duration --
+kept as one entry with the clearer label at that scale rather than two buttons for one duration.
+
+Every plain rolling window (1 hour through "last 30 days") reuses the already-verified `minutes=N`
+server computation unchanged -- an hour/day/week/month button is just a larger minute count client-side,
+nothing new server-side. **"Last week" and "last month" are genuinely different**, not just larger
+windows: they mean the previous *calendar* period (the Monday-Sunday week, or the 1st-through-last-day
+month, immediately before whichever one "now" falls inside), which isn't expressible as "N minutes/days
+before now" at all -- a new `calendar=lastweek|lastmonth` parameter on `/api/locations/track` handles
+these two specifically (`web/api_locations.php`'s new `zgt_calendar_range()`), computed against the
+server's own clock for the same timezone-consistency reason `minutes=` already established. ISO
+(Monday-start) weeks -- there's no other week-start convention anywhere in this app to match.
+
+**Verified three ways, precisely rather than by rough estimate**: (1) the calendar-boundary math itself,
+standalone, against 7 deliberately awkward reference dates (a Monday, a Sunday, the 1st of a month, a
+month's last day, a Feb/March leap-adjacent boundary, a Dec/Jan year boundary) -- every "last week" came
+back Monday-to-Sunday and every "last month" handled the rollover correctly, including the year
+boundary. (2) The full set of 16 non-"Live" windows against real data (posted through the actual
+`/api/overland` endpoint, not hand-inserted SQL -- see the same-day entry above for why that matters),
+cross-checked against expected point counts computed independently in Python from the exact server-side
+`now()` at query time (captured via a temporary debug log inside the real routed request, then removed)
+-- all 16 matched exactly, including confirming "last month" (calendar) genuinely differs from "last 30
+days" (rolling): one seeded point sat 35 days before "now" in rolling terms (correctly excluded from the
+30-day window) but squarely inside the previous calendar month (correctly included in "last month").
+(3) The dropdown itself, live: a real browser confirmed all 5 groups/17 options render with the right
+labels, and `web/js/map.js` run directly in Node against a stubbed Leaflet global confirmed selecting
+"Last month" fetches exactly `?calendar=lastmonth` and selecting "6 hours" fetches exactly
+`?minutes=360`. **Files**: `web/api_locations.php`, `web/js/map.js`, `web/templates/content/homepage.zetem`,
+`web/css/styles.css`.

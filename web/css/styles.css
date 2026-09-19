@@ -91,18 +91,16 @@ a:hover { text-decoration: underline; }
 .map-page { display: flex; gap: 1rem; height: calc(100vh - 140px); min-height: 400px; }
 .map-sidebar { width: 260px; flex-shrink: 0; overflow-y: auto; }
 .map-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
-.map-window-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.map-window-btn {
-    padding: 0.3rem 0.7rem;
-    font-size: 0.85rem;
+.map-window-row { display: flex; align-items: center; gap: 0.5rem; }
+.map-window-row label { font-size: 0.9rem; color: #6b7280; }
+#map-window-select {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.9rem;
     border: 1px solid var(--gt-border);
-    border-radius: 999px;
+    border-radius: 4px;
     background: #fff;
     color: var(--gt-text);
-    cursor: pointer;
 }
-.map-window-btn:hover { background: var(--gt-bg); }
-.map-window-btn.active { background: var(--gt-accent); border-color: var(--gt-accent); color: #fff; }
 .map-canvas { flex: 1; min-height: 0; border-radius: 6px; border: 1px solid var(--gt-border); }
 .device-list { list-style: none; margin: 0; padding: 0; }
 .device-item {
