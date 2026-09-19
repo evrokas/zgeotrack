@@ -37,7 +37,7 @@ function zgt_api_locations_latest($params) {
             'device_name' => $device->getname(),
             'lat' => (float)$loc->getlat(),
             'lon' => (float)$loc->getlon(),
-            'recorded_at' => $loc->getrecorded_at(),
+            'recorded_at' => zgt_iso8601($loc->getrecorded_at()),
             'speed' => $loc->getspeed() !== null ? (float)$loc->getspeed() : null,
             'battery_level' => $loc->getbattery_level() !== null ? (float)$loc->getbattery_level() : null,
         ];
@@ -107,7 +107,7 @@ function zgt_api_locations_track($params) {
         $points[] = [
             'lat' => (float)$loc->getlat(),
             'lon' => (float)$loc->getlon(),
-            'recorded_at' => $loc->getrecorded_at(),
+            'recorded_at' => zgt_iso8601($loc->getrecorded_at()),
         ];
     }
 
@@ -147,4 +147,23 @@ function zgt_calendar_range(string $which): array {
     // error for a malformed request; the map's own dropdown never sends
     // anything but 'lastweek'/'lastmonth' into this branch to begin with.
     return [date('Y-m-d H:i:s', $now), date('Y-m-d H:i:s', $now)];
+}
+
+// locations.recorded_at is stored as a bare 'Y-m-d H:i:s' string with no
+// timezone indicator -- but it IS real wall-clock time in whatever
+// timezone Kernel::__construct() activated from config/settings.info.yaml's
+// `tz:` (Europe/Athens here), not UTC (see locationsClassEx::
+// insertFromOverlandPoint(), which parses Overland's UTC 'Z' timestamp via
+// strtotime() but then formats it with date(), which always renders in the
+// active timezone). js/map.js's timeAgo() used to assume UTC by appending
+// 'Z' to this string directly -- wrong by exactly the Athens UTC offset
+// (+2h/+3h depending on DST), which made anything under 3 hours old
+// display as "0s ago" (Math.max(0, ...) clamping the resulting negative
+// age). Fixed at the source instead of patching the JS-side guess: re-parse
+// the naive string against the same active timezone with strtotime(), then
+// re-emit it via date('c') -- ISO-8601 WITH an explicit, DST-correct UTC
+// offset (e.g. '2026-09-19T13:05:14+03:00') -- so any standard-compliant
+// `new Date(...)` parse on the client is unambiguous, no guessing needed.
+function zgt_iso8601(string $recordedAt): string {
+    return date('c', strtotime($recordedAt));
 }

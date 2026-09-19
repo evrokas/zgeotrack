@@ -360,3 +360,44 @@ labels, and `web/js/map.js` run directly in Node against a stubbed Leaflet globa
 "Last month" fetches exactly `?calendar=lastmonth` and selecting "6 hours" fetches exactly
 `?minutes=360`. **Files**: `web/api_locations.php`, `web/js/map.js`, `web/templates/content/homepage.zetem`,
 `web/css/styles.css`.
+
+### Follow-up, same day: "time ago" on the map showed a 98-minute-old point as "0s ago"
+
+Asked directly: "is time in local time or UTC? settings.info should set time in Europe/Athens" --
+`config/settings.info.yaml` already has `tz: "Europe/Athens"` (unchanged, already correct, nothing to
+fix there), and every timestamp this app stores/computes server-side genuinely runs in that timezone
+(see `zeusfw`'s own `Kernel::__construct()`, which calls `date_default_timezone_set()` from it). But
+answering the question surfaced a real, separate display bug while checking every consumer of
+`locations.recorded_at`: `web/js/map.js`'s `timeAgo()` did `new Date(isoLike.replace(' ', 'T') +
+'Z').getTime()` -- appending `'Z'` (UTC) to a string that is actually **Athens local time**, not UTC
+(`locationsClassEx::insertFromOverlandPoint()` parses Overland's real UTC timestamp correctly via
+`strtotime()`, but then formats it for storage with `date('Y-m-d H:i:s', $ts)`, which renders in
+whatever timezone is currently active -- Athens, per `tz:` above -- with no offset indicator in the
+stored string itself).
+
+Reproduced directly before touching anything: a point genuinely 98 minutes old, fed through the
+unmodified `timeAgo()`, printed `"0s ago"` -- the bug reads "now" as 3 hours (Athens' current EEST
+offset) earlier than the real UTC instant, so anything under 3 hours old computed a *negative* age,
+silently clamped to 0 by the function's own `Math.max(0, ...)`. Same bug hit both the sidebar list and
+the marker popups (`timeAgo()`'s only two call sites) -- every device on the map looked freshly updated
+regardless of how stale its last fix actually was.
+
+Fixed at the source rather than guessing an offset client-side: `web/api_locations.php` now re-parses
+the stored naive string against the (already-active, already-correct) server timezone and re-emits it
+as a real ISO-8601 string with an explicit, DST-correct UTC offset (`date('c', strtotime($recordedAt))`
+-- e.g. `2026-09-19T13:08:41+03:00` in summer, `+02:00` in winter) via a new `zgt_iso8601()` helper,
+applied at both of that file's `recorded_at` output sites (`/api/locations/latest` and `/api/locations/
+track/{guid}`). `web/js/map.js`'s `timeAgo()` simplified to match -- `new Date(isoLike).getTime()`, no
+more manual `'Z'`-appending, since the string is now unambiguous on its own. Deliberately scoped to just
+these two JSON endpoints: `web/index.php`'s own `/locations` table-page handler and `locations_table.
+zetem` read `recorded_at` directly for a plain server-rendered `<td>` with no client-side date math at
+all, so they were never affected by this bug and didn't need this change (confirmed via a full grep of
+every `getrecorded_at()`/`recorded_at` call site in the app before scoping the fix this narrowly).
+
+**Verified precisely, not by rough estimate**: reproduced the bug first -- a real Athens-local timestamp
+98 minutes in the past, run through the original `timeAgo()`, printed `"0s ago"`. Then verified the fix
+in two steps mirroring the real request path: (1) PHP-side, `zgt_iso8601()` against that same simulated
+98-minutes-ago timestamp emitted `2026-09-19T13:08:41+03:00` (correct offset, correct instant); (2)
+JS-side, the simplified `timeAgo()` fed that exact string and correctly printed `"2h ago"` (round(98/60)
+= 2) instead of `"0s ago"`. `php -l` on `web/api_locations.php` and `node --check` on `web/js/map.js`
+both clean. **Files**: `web/api_locations.php`, `web/js/map.js`.

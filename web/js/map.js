@@ -77,8 +77,18 @@
         return PALETTE[Math.abs(hash) % PALETTE.length];
     }
 
+    // web/api_locations.php now emits recorded_at as a proper ISO-8601
+    // string with an explicit, DST-correct UTC offset (e.g.
+    // '2026-09-19T13:05:14+03:00' for Europe/Athens in summer) -- Date()
+    // parses that unambiguously, no guessing/appending 'Z' needed. (An
+    // earlier version of this function assumed the string was bare UTC and
+    // appended 'Z' itself; the API actually sent Athens local time with no
+    // offset at all, which under-reported age by the UTC offset -- e.g. a
+    // 98-minute-old point showed as "0s ago", clamped by the Math.max(0,
+    // ...) below. Fixed at the source in api_locations.php instead of
+    // guessing the offset here.)
     function timeAgo(isoLike) {
-        var then = new Date(isoLike.replace(' ', 'T') + 'Z').getTime();
+        var then = new Date(isoLike).getTime();
         var diffSeconds = Math.max(0, Math.round((Date.now() - then) / 1000));
         if (diffSeconds < 60) return diffSeconds + 's ago';
         if (diffSeconds < 3600) return Math.round(diffSeconds / 60) + 'm ago';
